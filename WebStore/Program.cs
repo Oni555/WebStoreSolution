@@ -1,7 +1,7 @@
 ﻿
 using Microsoft.EntityFrameworkCore;
 using WebStore.Assignments;
-using WebStore.Entities;
+//using WebStore.Entities;
 
 namespace WebStore
 {
