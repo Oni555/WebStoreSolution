@@ -22,8 +22,6 @@ namespace WebStore.Assignments
     public class LinqQueriesAssignment
     {
 
-        /* TODO: Uncomment this code after generating the entity models
-
         private readonly WebStoreContext _dbContext;
 
         public LinqQueriesAssignment(WebStoreContext context)
@@ -38,13 +36,9 @@ namespace WebStore.Assignments
         /// </summary>
         public async Task Task01_ListAllCustomers()
         {
-            // TODO: Write a LINQ query that fetches all customers
-            //       and prints their names + emails to the console.
-            // HINT: context.Customers
-            
             var customers = await _dbContext.Customers
-               // .AsNoTracking() // optional for read-only
-               .ToListAsync();
+                .Select(c => new { c.FirstName, c.LastName, c.Email })
+                .ToListAsync();
 
             Console.WriteLine("=== TASK 01: List All Customers ===");
 
@@ -53,7 +47,7 @@ namespace WebStore.Assignments
                 Console.WriteLine($"{c.FirstName} {c.LastName} - {c.Email}");
             }
 
-            
+
         }
 
         /// <summary>
@@ -72,8 +66,23 @@ namespace WebStore.Assignments
             // HINT: Use Include/ThenInclude or projection with .Select(...).
             //       Summing the quantities: order.OrderItems.Sum(oi => oi.Quantity).
 
+            var result = await _dbContext.Orders
+                .Select(order => new
+                {
+                    order.Customer.FirstName,
+                    order.Customer.LastName,
+                    order.OrderStatus,
+                    Quantity = order.OrderItems.Sum(orderItem => orderItem.Quantity)
+                })
+                .ToListAsync();
+
             Console.WriteLine(" ");
             Console.WriteLine("=== TASK 02: List Orders With Item Count ===");
+
+            foreach (var r in result)
+            {
+                Console.WriteLine($"{r.FirstName} {r.LastName} {r.OrderStatus} {r.Quantity}");
+            }
         }
 
         /// <summary>
@@ -85,8 +94,18 @@ namespace WebStore.Assignments
             // TODO: Write a query to fetch all products and sort them
             //       by descending price.
             // HINT: context.Products.OrderByDescending(p => p.Price)
-            Console.WriteLine(" ");
-            Console.WriteLine("=== Task 03: List Products By Descending Price ===");
+            Console.WriteLine("\n=== Task 03: List Products By Descending Price ===");
+
+            var result = await _dbContext.Products
+                .OrderByDescending(p => p.Price)
+                .ToListAsync();
+
+            foreach (var p in result)
+            {
+                Console.WriteLine($"Id: {p.ProductId}, name: {p.ProductName}, price: {p.Price}€");
+            }
+
+
         }
 
         /// <summary>
@@ -105,6 +124,26 @@ namespace WebStore.Assignments
             //       (oi.UnitPrice * oi.Quantity) - oi.Discount
             Console.WriteLine(" ");
             Console.WriteLine("=== Task 04: List Pending Orders With Total Price ===");
+
+            var result = await _dbContext.Orders
+                .Where(o => o.OrderStatus == "Pending")
+                .Select(o => new
+                {
+                    o.Customer,
+                    o.OrderId,
+                    o.OrderDate,
+                    TotalPrice = o.OrderItems.Sum(item => (item.UnitPrice * item.Quantity) - item.Discount)
+
+                })
+                .ToListAsync();
+
+            foreach (var o in result)
+            {
+                Console.WriteLine($"Name: {o.Customer.FirstName} {o.Customer.LastName}");
+                Console.WriteLine($"id: {o.OrderId}");
+                Console.WriteLine($"OrderDate: {o.OrderDate}");
+                Console.WriteLine($"Total Price: {o.TotalPrice}");
+            }
         }
 
         /// <summary>
@@ -122,8 +161,31 @@ namespace WebStore.Assignments
             //  1) Join Orders and Customers, or
             //  2) Use the navigation (context.Orders or context.Customers),
             //     then group by customer ID or by the customer entity.
-            Console.WriteLine(" ");
-            Console.WriteLine("=== Task 05: Order Count Per Customer ===");
+            Console.WriteLine("\n=== Task 05: Order Count Per Customer ===");
+
+            var result = await _dbContext.Orders
+                .Join(
+                _dbContext.Customers,
+                order => order.CustomerId,
+                customer => customer.CustomerId,
+                (order, customer) => new
+                {
+                    order,
+                    customer
+                })
+                .GroupBy(joined => joined.customer)
+                .Select(group => new
+                {
+                    customer = group.Key,
+                    OrderedQuantity = group.Count()
+                })
+                .ToListAsync();
+
+            foreach (var group in result)
+            {
+                Console.WriteLine($"Name: {group.customer.FirstName} {group.customer.LastName}");
+                Console.WriteLine($"OrderQuantity: {group.OrderedQuantity}");
+            }
         }
 
         /// <summary>
@@ -143,8 +205,24 @@ namespace WebStore.Assignments
             //         2) Summarize for each Customer
             //         3) Order by descending total
             //         4) Take(3)
-            Console.WriteLine(" ");
-            Console.WriteLine("=== Task 06: Top 3 Customers By Order Value ===");
+            Console.WriteLine("\n=== Task 06: Top 3 Customers By Order Value ===");
+
+            var result = await _dbContext.Customers
+                .Select(c => new
+                {
+                    c.CustomerId,
+                    Name = c.FirstName + " " + c.LastName,
+                    OrderTotal = c.Orders.Select(o => o.OrderItems.Sum(oi => oi.UnitPrice * oi.Quantity - oi.Discount)).Sum()
+                })
+                .OrderByDescending(o => o.OrderTotal)
+                .Take(3)
+                .ToListAsync();
+
+            foreach (var top in result)
+            {
+                Console.WriteLine($"Name: {top.Name}");
+                Console.WriteLine($"OrderTotal: {Math.Round((decimal)top.OrderTotal, 2)}");
+            }
         }
 
         /// <summary>
@@ -155,8 +233,17 @@ namespace WebStore.Assignments
         {
             // TODO: Filter orders to only those with OrderDate >= (DateTime.Now - 30 days).
             //       Output ID, date, and the customer's name.
-            Console.WriteLine(" ");
-            Console.WriteLine("=== Task 07: Recent Orders ===");
+            Console.WriteLine("\n=== Task 07: Recent Orders ===");
+            var result = await _dbContext.Orders
+                .Where(o => o.OrderDate <= (DateTime.Now.AddDays(-30)))
+                .ToListAsync();
+
+            foreach (var order in result)
+            {
+                Console.WriteLine($"OrderId: {order.OrderId}");
+                Console.WriteLine($"Date: {order.OrderDate}");
+                Console.WriteLine($"Name : {order.Customer.FirstName} {order.Customer.LastName}");
+            }
         }
 
         /// <summary>
@@ -169,8 +256,29 @@ namespace WebStore.Assignments
         {
             // TODO: Group or join OrdersItems by Product.
             //       Summation of quantity.
-            Console.WriteLine(" ");
-            Console.WriteLine("=== Task 08: Total Sold Per Product ===");
+            Console.WriteLine("\n=== Task 08: Total Sold Per Product ===");
+
+            var result = await _dbContext.Products
+                .Join(_dbContext.OrderItems,
+                product => product.ProductId,
+                orderItem => orderItem.ProductId,
+                (product, orderItem) => new
+                {
+                    product,
+                    orderItem
+                })
+                .Select(joined => new
+                {
+                    joined.product,
+                    OrderedQuantity = joined.orderItem.Quantity
+                })
+                .ToListAsync();
+
+            foreach (var product in result)
+            {
+                Console.WriteLine($"Product name: {product.product.ProductName}");
+                Console.WriteLine($"Total sold quantity: {product.OrderedQuantity}");
+            }
         }
 
         /// <summary>
@@ -181,8 +289,24 @@ namespace WebStore.Assignments
         {
             // TODO: Identify orders with any OrderItem having (Discount > 0).
             //       Display order details, plus the discounted products.
-            Console.WriteLine(" ");
-            Console.WriteLine("=== Task 09: Discounted Orders ===");
+            Console.WriteLine("\n=== Task 09: Discounted Orders ===");
+
+            var result = await _dbContext.Orders
+                .Where(order => order.OrderItems.Any(item => item.Discount > 0) && order.OrderItems.Count() > 0)
+                .ToListAsync();
+
+            foreach (var order in result)
+            {
+                Console.WriteLine($"OrderId: {order.OrderId}");
+                Console.WriteLine($"Customer name: {order.Customer.FirstName} {order.Customer.LastName}");
+                foreach (var item in order.OrderItems)
+                {
+                    Console.WriteLine($"Discounted Products: {item.Product.ProductName}");
+                    Console.WriteLine($"Discount: {item.Discount}");
+                }
+            }
+
+            // En tiedä toimiiko tämä. Molempien ordereitten orderitems näyttäisi oleva tyhjä debugissa mutta se menee silti läpi. En ymmärrä.
         }
 
         /// <summary>
@@ -209,9 +333,72 @@ namespace WebStore.Assignments
             // 4) Print a combined result
 
             // (Implementation is left as an exercise.)
-            Console.WriteLine(" ");
-            Console.WriteLine("=== Task 10: Advanced Query Example ===");
+            Console.WriteLine("\n=== Task 10: Advanced Query Example ===");
+
+            // En osannut tehdä enempää.
+
+            /*var result = await _dbContext.Products
+                .Where(product => product.Categories.Any(category => category.CategoryName == "Electronics"))
+                .Join(_dbContext.OrderItems,
+                product => product.ProductId,
+                orderItem => orderItem.ProductId,
+                (product, orderItem) => new
+                {
+                    product,
+                    orderItem
+                })
+                .Join(_dbContext.Orders,
+                joined => joined.orderItem.OrderId,
+                order => order.OrderId,
+                (joined, order) => new
+                {
+                    Order = order,
+                    Product = joined.product,
+                    OrderItem = joined.orderItem
+                })
+                .Join(
+                _dbContext.Stocks,
+                orderItem => orderItem.Product.ProductId,
+                stock => stock.ProductId,
+                (orderItem, stocks) => new
+                {
+                    Stocks = stocks,
+                    OrderItems = orderItem
+                })
+                .Join(
+                _dbContext.Stores,
+                joined => joined.Stocks.StoreId,
+                store => store.StoreId,
+                (joined, store) => new
+                {
+                    Store = store,
+                    OrderItems = joined.OrderItems
+                })
+                .Select(j => j.Store.Stocks.Any(s => s.QuantityInStock))
+                .ToListAsync();*/
+
+            var chatgptResult = await _dbContext.Products
+            .Where(p => p.Categories.Any(c => c.CategoryName == "Electronics") && p.OrderItems.Any())
+            .Select(p => new
+            {
+                Product = p,
+                MaxStock = p.Stocks
+                    .OrderByDescending(s => s.QuantityInStock)
+                    .Select(s => new
+                    {
+                        Store = s.Store,
+                        Quantity = s.QuantityInStock
+                    })
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+            foreach (var result in chatgptResult)
+            {
+                Console.WriteLine($"Product {result.Product}:");
+                Console.WriteLine($"StoreId: {result.MaxStock.Store.StoreId} Quantity: {result.MaxStock.Quantity}");
+            }
         }
-        */
+
     }
 }
